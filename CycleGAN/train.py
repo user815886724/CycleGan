@@ -161,6 +161,7 @@ if __name__ == '__main__':
             loss_D_B.backward()
             optimizer_D_B.step()
 
+
             # Progress report (http://localhost:8097)
             logger.log({'loss_G': loss_G, 'loss_G_identity': (loss_identity_A + loss_identity_B),
                         'loss_G_GAN': (loss_GAN_A2B + loss_GAN_B2A),
