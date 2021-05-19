@@ -171,7 +171,6 @@ if __name__ == '__main__':
         lr_scheduler_G.step()
         lr_scheduler_D_A.step()
         lr_scheduler_D_B.step()
-
         # Save models checkpoints
         torch.save(netG_A2B.state_dict(), 'output/netG_A2B.pth')
         torch.save(netG_B2A.state_dict(), 'output/netG_B2A.pth')
