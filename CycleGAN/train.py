@@ -13,6 +13,7 @@ from torch.utils import data
 from dataset import ImageDataset
 from utils import Logger
 import os
+import numpy as np
 
 
 def loss_function():
@@ -70,13 +71,6 @@ if __name__ == '__main__':
     optimizer_D_A = torch.optim.Adam(netD_A.parameters(), lr=opt.lr, betas=(0.5, 0.999))
     optimizer_D_B = torch.optim.Adam(netD_B.parameters(), lr=opt.lr, betas=(0.5, 0.999))
 
-    lr_scheduler_G = torch.optim.lr_scheduler.LambdaLR(optimizer_G, lr_lambda=LambdaLR(opt.n_epochs, opt.epoch,
-                                                                                       opt.decay_epoch).step)
-    lr_scheduler_D_A = torch.optim.lr_scheduler.LambdaLR(optimizer_D_A, lr_lambda=LambdaLR(opt.n_epochs, opt.epoch,
-                                                                                           opt.decay_epoch).step)
-    lr_scheduler_D_B = torch.optim.lr_scheduler.LambdaLR(optimizer_D_B, lr_lambda=LambdaLR(opt.n_epochs, opt.epoch,
-                                                                                           opt.decay_epoch).step)
-
     # try to load the pre_train to continue the last time training
     if opt.pre_train and os.path.exists(opt.model_info):
         # load the pre model
@@ -91,15 +85,27 @@ if __name__ == '__main__':
         optimizer_D_A.load_state_dict(model_info['optimizer_D_A'])
         optimizer_D_B.load_state_dict(model_info['optimizer_D_B'])
 
+        # load the epoch
+        opt.epoch = model_info['epoch']
+
+        lr_scheduler_G = torch.optim.lr_scheduler.LambdaLR(optimizer_G, lr_lambda=LambdaLR(opt.n_epochs, opt.epoch,
+                                                                                           opt.decay_epoch).step)
+        lr_scheduler_D_A = torch.optim.lr_scheduler.LambdaLR(optimizer_D_A, lr_lambda=LambdaLR(opt.n_epochs, opt.epoch,
+                                                                                               opt.decay_epoch).step)
+        lr_scheduler_D_B = torch.optim.lr_scheduler.LambdaLR(optimizer_D_B, lr_lambda=LambdaLR(opt.n_epochs, opt.epoch,
+                                                                                               opt.decay_epoch).step)
+
         # load the pre lr_scheduler
         lr_scheduler_G.load_state_dict(model_info['lr_scheduler_G'])
         lr_scheduler_D_A.load_state_dict(model_info['lr_scheduler_D_A'])
         lr_scheduler_D_B.load_state_dict(model_info['lr_scheduler_D_B'])
-
-        # load the epoch
-        opt.epoch = model_info['epoch']
-
-
+    else:
+        lr_scheduler_G = torch.optim.lr_scheduler.LambdaLR(optimizer_G, lr_lambda=LambdaLR(opt.n_epochs, opt.epoch,
+                                                                                           opt.decay_epoch).step)
+        lr_scheduler_D_A = torch.optim.lr_scheduler.LambdaLR(optimizer_D_A, lr_lambda=LambdaLR(opt.n_epochs, opt.epoch,
+                                                                                               opt.decay_epoch).step)
+        lr_scheduler_D_B = torch.optim.lr_scheduler.LambdaLR(optimizer_D_B, lr_lambda=LambdaLR(opt.n_epochs, opt.epoch,
+                                                                                               opt.decay_epoch).step)
 
     netG_A2B.apply(weights_init_normal)
     netG_B2A.apply(weights_init_normal)
@@ -131,6 +137,7 @@ if __name__ == '__main__':
     logger = Logger(opt.epoch, opt.n_epochs, len(dataloader))
 
     for epoch in range(opt.epoch, opt.n_epochs):
+        torch.manual_seed(np.random.randint(1000000))
         for i, batch in enumerate(dataloader):
             real_A = Variable(input_A.copy_(batch['A']))
             real_B = Variable(input_B.copy_(batch['B']))
@@ -209,7 +216,8 @@ if __name__ == '__main__':
 
         # save info of the train
         torch.save(
-            {"epoch": epoch+1, "optimizer_G": optimizer_G.state_dict(), "optimizer_D_A": optimizer_D_A.state_dict(), "optimizer_D_B": optimizer_D_B.state_dict(),
+            {"epoch": epoch + 1, "optimizer_G": optimizer_G.state_dict(), "optimizer_D_A": optimizer_D_A.state_dict(),
+             "optimizer_D_B": optimizer_D_B.state_dict(),
              "lr_scheduler_G": lr_scheduler_G.state_dict(), "lr_scheduler_D_A": lr_scheduler_D_A.state_dict(),
              "lr_scheduler_D_B": lr_scheduler_D_B.state_dict()}, opt.model_info)
         # Save models checkpoints
