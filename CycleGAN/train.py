@@ -74,7 +74,7 @@ if __name__ == '__main__':
     # try to load the pre_train to continue the last time training
     if opt.pre_train and os.path.exists(opt.model_info):
         # load the pre model
-        netG_A2B.load_state_dict(torch.load(torch.load(opt.generator_A2B)))
+        netG_A2B.load_state_dict(torch.load(opt.generator_A2B))
         netG_B2A.load_state_dict(torch.load(opt.generator_B2A))
         netD_A.load_state_dict(torch.load(opt.discriminator_A))
         netD_B.load_state_dict(torch.load(opt.discriminator_B))
