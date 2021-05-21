@@ -58,6 +58,12 @@ if __name__ == '__main__':
     netD_A = Discriminator(opt.input_nc)
     netD_B = Discriminator(opt.output_nc)
 
+    if opt.cuda:
+        netG_A2B.cuda()
+        netG_B2A.cuda()
+        netD_A.cuda()
+        netD_B.cuda()
+
     # Optimizers & LR schedulers
     optimizer_G = torch.optim.Adam(itertools.chain(netG_A2B.parameters(), netG_B2A.parameters()), lr=opt.lr,
                                    betas=(0.5, 0.999))
@@ -93,11 +99,7 @@ if __name__ == '__main__':
         # load the epoch
         opt.epoch = model_info['epoch']
 
-    if opt.cuda:
-        netG_A2B.cuda()
-        netG_B2A.cuda()
-        netD_A.cuda()
-        netD_B.cuda()
+
 
     netG_A2B.apply(weights_init_normal)
     netG_B2A.apply(weights_init_normal)
@@ -126,7 +128,7 @@ if __name__ == '__main__':
     dataloader = data.DataLoader(ImageDataset(opt.data_root, transforms_=transforms_, unaligned=True),
                                  batch_size=opt.batch_size, shuffle=True, num_workers=opt.n_cpu)
 
-    logger = Logger(opt.n_epochs, len(dataloader))
+    logger = Logger(opt.epoch, opt.n_epochs, len(dataloader))
 
     for epoch in range(opt.epoch, opt.n_epochs):
         for i, batch in enumerate(dataloader):
@@ -207,9 +209,9 @@ if __name__ == '__main__':
 
         # save info of the train
         torch.save(
-            {"epoch": epoch, "optimizer_G": optimizer_G, "optimizer_D_A": optimizer_D_A, "optimizer_D_B": optimizer_D_B,
-             "lr_scheduler_G": lr_scheduler_G, "lr_scheduler_D_A": lr_scheduler_D_A,
-             "lr_scheduler_D_B": lr_scheduler_D_B}, opt.model_info)
+            {"epoch": epoch+1, "optimizer_G": optimizer_G.state_dict(), "optimizer_D_A": optimizer_D_A.state_dict(), "optimizer_D_B": optimizer_D_B.state_dict(),
+             "lr_scheduler_G": lr_scheduler_G.state_dict(), "lr_scheduler_D_A": lr_scheduler_D_A.state_dict(),
+             "lr_scheduler_D_B": lr_scheduler_D_B.state_dict()}, opt.model_info)
         # Save models checkpoints
         torch.save(netG_A2B.state_dict(), opt.generator_A2B)
         torch.save(netG_B2A.state_dict(), opt.generator_B2A)
