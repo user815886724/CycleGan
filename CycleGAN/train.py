@@ -12,6 +12,7 @@ from PIL import Image
 from torch.utils import data
 from dataset import ImageDataset
 from utils import Logger
+import os
 
 
 def loss_function():
@@ -35,6 +36,16 @@ if __name__ == '__main__':
     parser.add_argument('--output_nc', type=int, default=3, help='number of channels of output data')
     parser.add_argument('--cuda', action='store_true', help='use GPU computation')
     parser.add_argument('--n_cpu', type=int, default=8, help='number of cup threads to use during batch generation')
+    parser.add_argument("--pre_train", action='store_true', help='continue to train model')
+    parser.add_argument('--model_info', type=str, default='output/model_info.pth', help='Model information file')
+    parser.add_argument('--generator_A2B', type=str, default='output/netG_A2B.pth',
+                        help='A2B generator checkpoint file')
+    parser.add_argument('--generator_B2A', type=str, default='output/netG_B2A.pth',
+                        help='B2A generator checkpoint file')
+    parser.add_argument('--discriminator_A', type=str, default='output/netD_A.pth',
+                        help='Discriminator_A checkpoint file')
+    parser.add_argument('--discriminator_B', type=str, default='output/netD_B.pth',
+                        help='Discriminator_B checkpoint file')
     opt = parser.parse_args()
 
     print(opt)
@@ -46,20 +57,6 @@ if __name__ == '__main__':
     netG_B2A = Generator(opt.output_nc, opt.input_nc)
     netD_A = Discriminator(opt.input_nc)
     netD_B = Discriminator(opt.output_nc)
-
-    if opt.cuda:
-        netG_A2B.cuda()
-        netG_B2A.cuda()
-        netD_A.cuda()
-        netD_B.cuda()
-
-
-    netG_A2B.apply(weights_init_normal)
-    netG_B2A.apply(weights_init_normal)
-    netD_A.apply(weights_init_normal)
-    netD_B.apply(weights_init_normal)
-
-    criterion_GAN, criterion_cycle, criterion_identity = loss_function()
 
     # Optimizers & LR schedulers
     optimizer_G = torch.optim.Adam(itertools.chain(netG_A2B.parameters(), netG_B2A.parameters()), lr=opt.lr,
@@ -73,6 +70,41 @@ if __name__ == '__main__':
                                                                                            opt.decay_epoch).step)
     lr_scheduler_D_B = torch.optim.lr_scheduler.LambdaLR(optimizer_D_B, lr_lambda=LambdaLR(opt.n_epochs, opt.epoch,
                                                                                            opt.decay_epoch).step)
+
+    # try to load the pre_train to continue the last time training
+    if opt.pre_train and os.path.exists(opt.model_info):
+        # load the pre model
+        netG_A2B.load_state_dict(torch.load(torch.load(opt.generator_A2B)))
+        netG_B2A.load_state_dict(torch.load(opt.generator_B2A))
+        netD_A.load_state_dict(torch.load(opt.discriminator_A))
+        netD_B.load_state_dict(torch.load(opt.discriminator_B))
+
+        # load the pre optimizer
+        model_info = torch.load(opt.model_info)
+        optimizer_G.load_state_dict(model_info['optimizer_G'])
+        optimizer_D_A.load_state_dict(model_info['optimizer_D_A'])
+        optimizer_D_B.load_state_dict(model_info['optimizer_D_B'])
+
+        # load the pre lr_scheduler
+        lr_scheduler_G.load_state_dict(model_info['lr_scheduler_G'])
+        lr_scheduler_D_A.load_state_dict(model_info['lr_scheduler_D_A'])
+        lr_scheduler_D_B.load_state_dict(model_info['lr_scheduler_D_B'])
+
+        # load the epoch
+        opt.epoch = model_info['epoch']
+
+    if opt.cuda:
+        netG_A2B.cuda()
+        netG_B2A.cuda()
+        netD_A.cuda()
+        netD_B.cuda()
+
+    netG_A2B.apply(weights_init_normal)
+    netG_B2A.apply(weights_init_normal)
+    netD_A.apply(weights_init_normal)
+    netD_B.apply(weights_init_normal)
+
+    criterion_GAN, criterion_cycle, criterion_identity = loss_function()
 
     Tensor = torch.cuda.FloatTensor if opt.cuda else torch.Tensor
     input_A = Tensor(opt.batch_size, opt.input_nc, opt.size, opt.size)
@@ -172,8 +204,14 @@ if __name__ == '__main__':
         lr_scheduler_G.step()
         lr_scheduler_D_A.step()
         lr_scheduler_D_B.step()
+
+        # save info of the train
+        torch.save(
+            {"epoch": epoch, "optimizer_G": optimizer_G, "optimizer_D_A": optimizer_D_A, "optimizer_D_B": optimizer_D_B,
+             "lr_scheduler_G": lr_scheduler_G, "lr_scheduler_D_A": lr_scheduler_D_A,
+             "lr_scheduler_D_B": lr_scheduler_D_B}, opt.model_info)
         # Save models checkpoints
-        torch.save(netG_A2B.state_dict(), 'output/netG_A2B.pth')
-        torch.save(netG_B2A.state_dict(), 'output/netG_B2A.pth')
-        torch.save(netD_A.state_dict(), 'output/netD_A.pth')
-        torch.save(netD_B.state_dict(), 'output/netD_B.pth')
+        torch.save(netG_A2B.state_dict(), opt.generator_A2B)
+        torch.save(netG_B2A.state_dict(), opt.generator_B2A)
+        torch.save(netD_A.state_dict(), opt.discriminator_A)
+        torch.save(netD_B.state_dict(), opt.discriminator_B)
